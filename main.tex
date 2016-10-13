@@ -29,44 +29,67 @@
   tabsize=3
 }
 \bibliography{ROOT0908}
-\title{Using Trees in ROOT}
+\title{PHYS-592 Mid-Term}
 \author{Jason Wyenberg}
 \begin{document}
 \maketitle
 \begin{abstract}
-I demonstrate how to create a Tree file and read a histogram from it, and then plot some data.
+The PHYS-592 Mid-Term is upon us!
 \end{abstract}
 \section{Trees with ROOT}
-\subsection{Creating a Tree and Working with the Data}
+\subsection{Energy Spectrum}
+Figure \ref{Figure1} below shows the energy spectrum from the data.
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=.8\linewidth]{Figure1}
+  \caption{Energy Spectrum}
+  \label{Figure1}
+\end{figure}
+\subsection{Normalized Energy Spectrum}
+Figure \ref{Figure2} below shows the normalized energy spectrum from the data, with a gaussian fit.
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=.8\linewidth]{Figure2}
+  \caption{Normalized Energy Spectrum}
+  \label{Figure2}
+\end{figure}
+\subsection{Distribution}
+Figure \ref{Figure3} below shows the distribution of events. It looks like the detector is a spherical shape based on the distribution plot.
+\begin{figure}[htpb]
+  \centering
+  \includegraphics[width=.8\linewidth]{Figure3}
+  \caption{Normalized Energy Spectrum}
+  \label{Figure3}
+\end{figure}
+\subsection{The code that was used}
 The following code was written as a script for Root:
 \begin{lstlisting}
-// C file that builds a tree and generates a histogram of the dm data from Jing's oil.dat file
+// C file that builds a tree and generates a histogram of the data from Jing's energy data.txt file
 
-void oil(){
+void exam(){
 
 //Declare variables
 
-  Char_t   date[11];
-  Int_t    dd;
-  Int_t    milage;
-  Int_t    dm;
-  Float_t  daily;
+  Float_t    energy;
+  Float_t    posx;
+  Float_t    posy;
+  Float_t    posz;
 
 //Create new files
-  TFile *f = new TFile("oil.root","RECREATE");
+  TFile *f = new TFile("exam.root","RECREATE");
   
-  FILE *fp = fopen("oil.dat","r");
+  FILE *fp = fopen("data.txt","r");
 //fopen opens oil.dat. "r" means read and write
   
-  TTree *tree = new TTree("T","Jing's Oil data");
-  tree->Branch("date",&date,"date/C");
-  tree->Branch("dd",&dd,"dd/I");
-  tree->Branch("milage",&milage,"milage/I");
-  tree->Branch("dm",&dm,"dm/I");
-  tree->Branch("daily",&daily,"daily/F");
-  char line[40];    //number of entries must be greater than the amount of lines
-  while (fgets(&line,40,fp)) {
-    sscanf(&line[0], "%s %d %d %d %g",&date,&dd,&milage,&dm,&daily);
+  TTree *tree = new TTree("T","Jing's Exam data");
+  tree->Branch("energy",&energy,"energy/F");
+  tree->Branch("posx",&posx,"posx/F");
+  tree->Branch("posy",&posy,"posy/F");
+  tree->Branch("posz",&posz,"posz/F");
+  
+  char line[8900];    //number of entries must be greater than the amount of lines
+  while (fgets(&line,8900,fp)) {
+    sscanf(&line[0], "%g %g %g %g",&energy,&posx,&posy,&posz);
     tree->Fill();
   }
   
@@ -75,43 +98,65 @@ void oil(){
   
   TCanvas *can = new TCanvas;
   can->Divide(2,2);
-  can->cd(1);
-  T->Draw("dd:dm:daily","daily<100","colz");
+//  can->cd(1);
+//  T->Draw("energy:posx:posy","posy<25","colz");
   
-  TH1F *hdm = new TH1F("hdm",";daily milage", 10, 0, 8500);
+  TH1F *henergy = new TH1F("hnenergy",";energy", 200, 0, 3000);
 
   int n = (Int_t)T->GetEntries();
   for (Int_t i=0; i<n; i++)  {
     T->GetEntry(i);
-    hdm->Fill(dm);
+    henergy->Fill(energy);
   }
   
-  can->cd(2);
-  hdm->Draw();
+  can->cd(1)->SetLogy();
+  can->cd(1)->SetLogx();
+  can->cd(1)->SetGridy();
+  can->cd(1)->SetGridx();
+  henergy->GetYaxis()->SetTitle("Count");
+  henergy->GetXaxis()->SetTitle("Energy [keV]");
+  henergy->Draw();
+
+  TH1F *hnenergy = (TH1F*) henergy->Clone();
+//  hnenergy->SetName("hnenergy");
+//  hnenergy->GetXaxis()->SetRange(600,720);   //this does not seem to be working for me
   
-  can->cd(3);
-  hdm->Draw("e");
+  TH1F *hnenergy2 = new TH1F("hnenergy2",";energy", 200, 600, 720);
+
+  int n = (Int_t)T->GetEntries();
+  for (Int_t i=0; i<n; i++)  {
+    T->GetEntry(i);
+    hnenergy2->Fill(energy);
+  }
+
+  hnenergy2->Sumw2();
   
-  TF1 *fc = new TF1("fc","[3]*x+gaus(0)",0,8500);
-  fc->SetParameters(13.,4000.,4000.,.00025);
+  can->cd(2)->SetLogy();
+  can->cd(2)->SetLogx();
+  can->cd(2)->SetGridy();
+  can->cd(2)->SetGridx();
+  float scale_factor = 3*60*3600;
+  hnenergy2->Scale(1./scale_factor);
+  hnenergy2->GetYaxis()->SetTitle("Rate [Hz]");
+  hnenergy2->GetXaxis()->SetTitle("Energy [keV]");
+  hnenergy2->Draw("e");
+  
+  TF1 *fc = new TF1("fc","[3]+gaus(0)",0,8500);
+  fc->SetParameters(.0001,680.,20.,.000005);
   fc->SetLineColor(kMagenta);
-  TGraph *gr = new TGraph(hdm);
+  TGraph *gr = new TGraph(hnenergy2);
   gr->SetTitle("Fit");
   gr->Fit("fc");
-  gr->Draw("a*");
+  gr->Draw("same");
   
-  hdm->Print();
-  hdm->Write();
+  can->cd(3);
+  T->Draw("posy:posx:posz","","colz");
+  
+  hnenergy->Print();
+  hnenergy->Write();
   
 }
 \end{lstlisting}
-The result was the plots shown in Figure \ref{Oil_data}.
-\begin{figure}[htpb]
-  \centering
-  \includegraphics[width=.8\linewidth]{Oil_data}
-  \caption{Data from Tree}
-  \label{Oil_data}
-\end{figure}
 \newpage
 \printbibliography 
 \end{document}
